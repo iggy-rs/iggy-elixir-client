@@ -1,0 +1,13 @@
+[package]
+authors = []
+name = "iggy_nif"
+version = "0.1.0"
+
+[lib]
+crate-type = ["dylib"]
+name = "iggy_nif"
+path = "src/lib.rs"
+
+[dependencies]
+iggy = "0.1.4"
+rustler = "0.30.0"
