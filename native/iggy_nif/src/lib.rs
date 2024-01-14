@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate rustler;
-extern crate iggy; // This assumes the Iggy crate is similarly structured.
+extern crate iggy_nif; // This assumes the Iggy crate is similarly structured.
 
 use iggy::{Client, Stream};
 use rustler::{Encoder, Env, Error, Term}; // Replace with actual modules you need from Iggy.
