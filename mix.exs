@@ -6,6 +6,7 @@ defmodule IggyEx.MixProject do
       app: :iggy_ex,
       version: "0.1.0",
       elixir: "~> 1.14",
+      package: package(),
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -22,6 +23,19 @@ defmodule IggyEx.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.30.0"}
+    ]
+  end
+
+  defp package() do
+    [
+      files:
+        ~w(lib native/iggy_nif/src native/iggy_nif/Cargo* native/iggy_nif/.cargo .formatter.exs mix.exs README* LICENSE*
+                ),
+      licenses: ["Apache-2.0"],
+      links: %{
+        "GitHub" => "https://github.com/iggy-rs/iggy-elixir-client",
+        "Docs" => "https://hexdocs.pm/iggy_ex"
+      }
     ]
   end
 end

@@ -1,19 +1,16 @@
 #[macro_use]
 extern crate rustler;
-extern crate iggy_nif; // This assumes the Iggy crate is similarly structured.
+// extern crate iggy_nif;
 
 use iggy::{Client, UserClient};
-// use rustler::{Encoder, Env, Error, Term}; // Replace with actual modules you need from Iggy.
 use rustler::{Error, NifResult, NifTuple, ResourceArc};
 use async_std::task;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex}; // Import Mutex
 use tracing::info;
 use iggy::users::defaults::*;
 use iggy::users::login_user::LoginUser;
 use std::env;
-use std::error::Error;
-use std::sync::Arc;
-use std::time::Duration;
+use std::error::Error as StdError; // Rename to avoid conflict
 use tokio::time::sleep;
 //much copied from https://github.com/iggy-rs/iggy/blob/master/examples/src/getting-started/consumer/main.rs
 
@@ -62,20 +59,21 @@ fn login_user() -> Result<Term, Error> {
     match task::block_on(client.connect()) {
         Ok(()) => 
 
-        match task::block_on(client
-        .login_user(&LoginUser {
-            username: DEFAULT_ROOT_USERNAME.to_string(),
-            password: DEFAULT_ROOT_PASSWORD.to_string(),
-        })) {
-            Ok(_identityInfo) => NifResult<IggyResourceResponse>{
-                ok: atom::ok(),
-                client: ResourceArc::new(client)
+            match task::block_on(client
+            .login_user(&LoginUser {
+                username: DEFAULT_ROOT_USERNAME.to_string(),
+                password: DEFAULT_ROOT_PASSWORD.to_string()
+            })) {
+                Ok(_identityInfo) => NifResult<IggyResourceResponse>{
+                    ok: atom::ok(),
+                    client: ResourceArc::new(client)
+                }
+                
+                Err(err) => Err(Error::Term(Box::new(err.to_string())))
             }
-            
-        }
 
-        }),
         Err(err) => Err(Error::Term(Box::new(err.to_string())))
+    }
 
 }
 // #[rustler::nif]
