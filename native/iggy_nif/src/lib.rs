@@ -1,34 +1,30 @@
-#[macro_use]
+// #[macro_use]
 extern crate rustler;
 extern crate iggy;
-extern crate async_std;
+// extern crate async_std;
 // extern crate tokio;
 // extern crate tracing;
 // extern crate tracing_subscriber;
 
-use iggy::client::{Client};
-use iggy::clients::client::{IggyClient, IggyClientConfig};
-use rustler::{Error, NifResult, NifTuple, ResourceArc, Term, Atom};
-use async_std::task;
-use std::sync::{Arc, Mutex}; // Import Mutex
+// use iggy::client::{Client};
+// use iggy::clients::client::{IggyClient, IggyClientConfig};
+// use rustler::{Error, NifResult, NifTuple, ResourceArc, Term, Atom};
+use rustler::{Env, NifResult, Term, Atom};
+use iggy::users::defaults::{DEFAULT_ROOT_PASSWORD, DEFAULT_ROOT_USERNAME};
+pub mod atom;
+
+// use async_std::task;
+// use std::sync::{Arc, Mutex}; // Import Mutex
 // use iggy::users::defaults::*;
-// use iggy::users::login_user::LoginUser;
+use iggy::users::login_user::LoginUser;
 // use std::env;
 // use std::error::Error as StdError; // Rename to avoid conflict
 // use tokio::time::sleep;
 //much copied from https://github.com/iggy-rs/iggy/blob/master/examples/src/getting-started/consumer/main.rs
-
-mod atoms {
-    rustler::atoms! {
-        // Define atoms for common responses or errors you might encounter.
-        ok,
-        error,
-        // Add any specific atoms you might need.
-    }
-}
+// use crate::atom;
 
 rustler::init!(
-    "Elixir.IggyNif",
+    "Elixir.IggyEx",
     [
         login_user,
         ping
@@ -36,30 +32,37 @@ rustler::init!(
     load = on_load
 );
 
-fn on_load(env: Env, _info: Term) -> bool {
+fn on_load(_env: Env, _info: Term) -> bool {
     true
 }
 
 
-pub struct IggyResource {
-    pub iggy: Mutex<IggyClient>,
-}
-#[derive(NifTuple)]
-pub struct IggyResourceResponse {
-    pub ok: Atom,
-    pub resource: ResourceArc<IggyResource>,
-}
+// pub struct IggyResource {
+//     pub iggy: Mutex<IggyClient>,
+// }
+// #[derive(NifTuple)]
+// pub struct IggyResourceResponse {
+//     pub ok: Atom,
+//     pub resource: ResourceArc<IggyResource>,
+// }
 
 
 // Example of a NIF function you might have for creating a new Iggy client.
 #[rustler::nif]
-fn ping() -> Result<Atom, Error> {
+fn ping() -> NifResult<Atom> {
     // Logic to create a new Iggy client.
     // Return an ok tuple or error based on operation result.
+    Ok(atom::ok())
 }
 
-fn login_user() -> Result<Atom, Error> {
+#[rustler::nif]
+fn login_user(_username: String, _password: String) -> NifResult<Atom> {
    //See below, notionally
+   let _login_user = LoginUser {
+        username: DEFAULT_ROOT_USERNAME.to_string(),
+        password: DEFAULT_ROOT_PASSWORD.to_string(),
+    };
+   Ok(atom::ok())
 }
 
 // #[rustler::nif]
