@@ -1198,7 +1198,9 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "iggy",
+ "lazy_static",
  "rustler",
+ "rustler_codegen",
  "tokio",
  "tracing",
  "tracing-subscriber",
