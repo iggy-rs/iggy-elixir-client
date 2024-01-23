@@ -6,12 +6,18 @@ extern crate iggy;
 // extern crate tracing;
 // extern crate tracing_subscriber;
 
-// use iggy::client::{Client};
-// use iggy::clients::client::{IggyClient, IggyClientConfig};
-// use rustler::{Error, NifResult, NifTuple, ResourceArc, Term, Atom};
+    use iggy::client::{ UserClient};
+use rustler::{Error, NifResult, NifTuple, ResourceArc, Term, Atom};
+use iggy::clients::client::{IggyClient};
+
+use client::IggyClient;
+use iggy::system::ping::Ping;
 use rustler::{Env, NifResult, Term, Atom};
+use tokio::runtime::{Builder, Runtime};
 use iggy::users::defaults::{DEFAULT_ROOT_PASSWORD, DEFAULT_ROOT_USERNAME};
 pub mod atom;
+
+// pub mod client;
 
 // use async_std::task;
 // use std::sync::{Arc, Mutex}; // Import Mutex
@@ -33,36 +39,78 @@ rustler::init!(
 );
 
 fn on_load(_env: Env, _info: Term) -> bool {
+    rustler::resource!(IggyClient, env);
     true
 }
 
-
-// pub struct IggyResource {
-//     pub iggy: Mutex<IggyClient>,
-// }
-// #[derive(NifTuple)]
-// pub struct IggyResourceResponse {
-//     pub ok: Atom,
-//     pub resource: ResourceArc<IggyResource>,
-// }
-
-
-// Example of a NIF function you might have for creating a new Iggy client.
-#[rustler::nif]
-fn ping() -> NifResult<Atom> {
-    // Logic to create a new Iggy client.
-    // Return an ok tuple or error based on operation result.
-    Ok(atom::ok())
+pub struct IggyResource {
+    inner: RustIggyClient,
+    runtime: Runtime,
 }
 
-#[rustler::nif]
-fn login_user(_username: String, _password: String) -> NifResult<Atom> {
-   //See below, notionally
-   let _login_user = LoginUser {
-        username: DEFAULT_ROOT_USERNAME.to_string(),
-        password: DEFAULT_ROOT_PASSWORD.to_string(),
-    };
-   Ok(atom::ok())
+impl IggyResource {
+    /// Constructs a new IggyClient.
+    ///
+    /// This initializes a new runtime for asynchronous operations.
+    /// Future versions might utilize asyncio for more Pythonic async.
+    #[new]
+    fn new() -> Self {
+        // TODO: use asyncio
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(4) // number of worker threads
+            .enable_all() // enables all available Tokio features
+            .build()
+            .unwrap();
+        IggyResource {
+            inner: RustIggyClient::default(),
+            runtime,
+        }
+    }
+
+    /// Logs in the user with the given credentials.
+    /// 
+    /// Returns `Ok(())` on success, or a PyRuntimeError on failure.
+    fn login_user(&self, username: String, password: String) -> PyResult<()> {
+        let login_command = LoginUser { username, password };
+
+        let login_future = self.inner.login_user(&login_command);
+        self.runtime
+            .block_on(async move { login_future.await })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
+        PyResult::Ok(())
+    }
+
+
+#[derive(NifTuple)]
+pub struct IggyResourceResponse {
+    pub ok: Atom,
+    pub resource: ResourceArc<IggyResource>,
+}
+
+
+    // Example of a NIF function you might have for creating a new Iggy client.
+    #[rustler::nif]
+    fn ping() -> NifResult<Atom> {
+        // Logic to create a new Iggy client.
+        // Return an ok tuple or error based on operation result.
+        let client = IggyClient::default();
+        // let client = IggyClient::create(client, IggyClientConfig::default(), None, None, None);
+        
+
+
+        // Ok(atom::ok())
+    }
+
+    #[rustler::nif]
+    fn login_user(_username: String, _password: String) -> NifResult<Atom> {
+    //See below, notionally
+    let _login_user = LoginUser {
+            username: DEFAULT_ROOT_USERNAME.to_string(),
+            password: DEFAULT_ROOT_PASSWORD.to_string(),
+        };
+    Ok(atom::ok())
+    }
+
 }
 
 // #[rustler::nif]
