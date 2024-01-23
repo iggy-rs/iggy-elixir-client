@@ -24,8 +24,10 @@ iggy_ex-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-debug/
-target/
-Cargo.lock
+
+#Rust compilation artifacts
+native/iggy_nif/debug/
+native/iggy_nif/target/
+native/iggy_nif/Cargo.lock
 **/*.rs.bk
 *.pdb
