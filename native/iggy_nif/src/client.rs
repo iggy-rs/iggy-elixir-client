@@ -1,12 +1,13 @@
-use iggy::users::login_user::LoginUser;
-use tokio::runtime::{Builder, Runtime};
-use iggy::client::{Client, SystemClient, UserClient};
+use crate::atom;
+use iggy::client::{Client, StreamClient, SystemClient, UserClient};
 use iggy::clients::client::IggyClient;
+use iggy::streams::create_stream::CreateStream;
 use iggy::system::ping::Ping;
+use iggy::users::login_user::LoginUser;
 use lazy_static::lazy_static;
 use rustler::{Encoder, Error as RustlerError};
 use rustler::{Env, Term};
-use crate::atom;
+use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
     static ref IGGY_CLIENT: IggyResource = IggyResource::new();
@@ -32,7 +33,7 @@ impl IggyResource {
 }
 
 #[rustler::nif]
-fn connect(env: Env) ->  Result<Term, RustlerError> {
+fn connect(env: Env) -> Result<Term, RustlerError> {
     let resource = &IGGY_CLIENT;
 
     let connect_future = resource.inner.connect();
@@ -63,10 +64,7 @@ fn ping(env: Env) -> Result<Term, RustlerError> {
 fn login_user(env: Env, username: String, password: String) -> Result<Term, RustlerError> {
     let resource = &IGGY_CLIENT;
 
-    let login_user = LoginUser {
-        username,
-        password,
-    };
+    let login_user = LoginUser { username, password };
     let login_user_future = resource.inner.login_user(&login_user);
     let result = resource.runtime.block_on(login_user_future);
 
@@ -75,6 +73,54 @@ fn login_user(env: Env, username: String, password: String) -> Result<Term, Rust
         Err(err) => Err(RustlerError::Term(Box::new(err.to_string()))),
     }
 }
+
+#[rustler::nif]
+fn create_stream(env: Env, stream_id: u32, name: String) -> Result<Term, RustlerError> {
+    let resource = &IGGY_CLIENT;
+    let create_stream = CreateStream {
+        stream_id: Some(stream_id),
+        name,
+    };
+    let create_stream_future = resource.inner.create_stream(&create_stream);
+
+    match resource
+        .runtime
+        .block_on(async move { create_stream_future.await })
+    {
+        Ok(_) => Ok(atom::ok().encode(env)),
+        Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
+    }
+}
+
+// #[rustler::nif]
+// fn create_topic(env: Env,
+//     stream_id: u32,
+//     topic_id: u32,
+//     partitions_count: u32,
+//     name: String,) -> Result<Term, RustlerError> {
+
+// }
+
+// #[rustler::nif]
+// fn send_messages(env: Env,
+//     stream_id: u32,
+//     topic_id: u32,
+//     partitioning: u32,
+//     messages: &ListIterator) -> Result<Term, RustlerError> {
+
+// }
+
+// #[rustler::nif]
+// fn poll_messages(
+//     env: Env,
+//     stream_id: u32,
+//     topic_id: u32,
+//     partition_id: u32,
+//     count: u32,
+//     auto_commit: bool,
+// ) -> Result<ListIterator, RustlerError> {
+// }
+
 // TODO:
 // Port remaining functions from Python client
 //
