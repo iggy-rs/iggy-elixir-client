@@ -1,8 +1,10 @@
 use crate::atom;
-use iggy::client::{Client, StreamClient, SystemClient, UserClient};
+use iggy::client::{Client, StreamClient, SystemClient, TopicClient, UserClient};
 use iggy::clients::client::IggyClient;
+use iggy::identifier::Identifier;
 use iggy::streams::create_stream::CreateStream;
 use iggy::system::ping::Ping;
+use iggy::topics::create_topic::CreateTopic;
 use iggy::users::login_user::LoginUser;
 use lazy_static::lazy_static;
 use rustler::{Encoder, Error as RustlerError};
@@ -92,16 +94,41 @@ fn create_stream(env: Env, stream_id: u32, name: String) -> Result<Term, Rustler
     }
 }
 
-// #[rustler::nif]
-// fn create_topic(env: Env,
-//     stream_id: u32,
-//     topic_id: u32,
-//     partitions_count: u32,
-//     name: String,) -> Result<Term, RustlerError> {
+#[rustler::nif]
+fn create_topic(
+    env: Env,
+    stream_id: u32,
+    topic_id: u32,
+    partitions_count: u32,
+    name: String,
+) -> Result<Term, RustlerError> {
+    let resource = &IGGY_CLIENT;
+    let stream_identifier = match Identifier::numeric(stream_id).map_err(|e| e) {
+        Ok(identifier) => identifier,
+        Err(_e) => return Err(RustlerError::Term(Box::new("Invalid stream identifier"))),
+    };
 
-// }
+    let create_topic = CreateTopic {
+        stream_id: stream_identifier,
+        topic_id: Some(topic_id),
+        name,
+        partitions_count,
+        max_topic_size: None,
+        message_expiry: None,
+        replication_factor: 1,
+    };
+    let create_topic_future = resource.inner.create_topic(&create_topic);
 
-// #[rustler::nif]
+    match resource
+        .runtime
+        .block_on(async move { create_topic_future.await })
+    {
+        Ok(_) => Ok(atom::ok().encode(env)),
+        Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
+    }
+}
+
+// #[rustler::nif(schedule = "DirtyIo")]
 // fn send_messages(env: Env,
 //     stream_id: u32,
 //     topic_id: u32,
@@ -110,7 +137,7 @@ fn create_stream(env: Env, stream_id: u32, name: String) -> Result<Term, Rustler
 
 // }
 
-// #[rustler::nif]
+// #[rustler::nif(schedule = "DirtyIo")]
 // fn poll_messages(
 //     env: Env,
 //     stream_id: u32,

@@ -9,7 +9,8 @@ rustler::init!(
         client::ping,
         client::login_user,
         client::connect,
-        client::create_stream
+        client::create_stream,
+        client::create_topic
     ],
     load = on_load
 );

@@ -6,4 +6,6 @@ defmodule IggyEx do
   def ping(), do: :erlang.nif_error(:nif_not_loaded)
   def login_user(_username, _password), do: :erlang.nif_error(:nif_not_loaded)
   def create_stream(_stream_id, _name), do: :erlang.nif_error(:nif_not_loaded)
+  def create_topic(_stream_id, _topic_id, _partitions_count, _name),
+    do: :erlang.nif_error(:nif_not_loaded)
 end
