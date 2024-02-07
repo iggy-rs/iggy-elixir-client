@@ -11,7 +11,8 @@ rustler::init!(
         client::connect,
         client::create_stream,
         client::create_topic,
-        client::send_message
+        client::send_messages,
+        client::send_message,
     ],
     load = on_load
 );

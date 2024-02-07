@@ -1,8 +1,6 @@
-// use std::fmt::Debug;
 use std::str::FromStr;
 
 use crate::atom;
-// use crate::send_message::SendMessage;
 use iggy::client::{Client, MessageClient, StreamClient, SystemClient, TopicClient, UserClient};
 use iggy::clients::client::IggyClient;
 use iggy::identifier::Identifier;
@@ -51,7 +49,7 @@ fn connect(env: Env) -> Result<Term, RustlerError> {
         Err(err) => Err(RustlerError::Term(Box::new(err.to_string()))),
     }
 }
-// for slower functions remember to use dirty scheduler
+
 //#[rustler::nif(schedule = "DirtyCpu")]
 #[rustler::nif]
 fn ping(env: Env) -> Result<Term, RustlerError> {
@@ -90,10 +88,7 @@ fn create_stream(env: Env, stream_id: u32, name: String) -> Result<Term, Rustler
     };
     let create_stream_future = resource.inner.create_stream(&create_stream);
 
-    match resource
-        .runtime
-        .block_on(async move { create_stream_future.await })
-    {
+    match resource.runtime.block_on(create_stream_future) {
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
@@ -124,10 +119,7 @@ fn create_topic(
     };
     let create_topic_future = resource.inner.create_topic(&create_topic);
 
-    match resource
-        .runtime
-        .block_on(async move { create_topic_future.await })
-    {
+    match resource.runtime.block_on(create_topic_future) {
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
@@ -153,10 +145,7 @@ fn send_message(
     };
 
     let send_message_future = resource.inner.send_messages(&mut msgs);
-    match resource
-        .runtime
-        .block_on(async move { send_message_future.await })
-    {
+    match resource.runtime.block_on(send_message_future) {
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
@@ -173,9 +162,7 @@ fn send_messages<'a>(
     let resource = &IGGY_CLIENT;
     let messages: Vec<RustMessage> = messages
         .into_iter()
-        .map(|message|
-            RustMessage::from_str(&message.decode::<String>().unwrap()).unwrap()
-        )
+        .map(|message| RustMessage::from_str(&message.decode::<String>().unwrap()).unwrap())
         .collect();
 
     let mut messages = SendMessages {
@@ -185,11 +172,8 @@ fn send_messages<'a>(
         messages,
     };
 
-    let send_message_future = resource.inner.send_messages(&mut messages);
-    match resource
-        .runtime
-        .block_on(async move { send_message_future.await })
-    {
+    let send_messages_future = resource.inner.send_messages(&mut messages);
+    match resource.runtime.block_on(send_messages_future) {
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
