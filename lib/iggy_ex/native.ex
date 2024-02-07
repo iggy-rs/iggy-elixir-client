@@ -12,4 +12,7 @@ defmodule IggyEx do
 
   def send_messages(_stream_id, _topic_id, _partitioning, _messages),
     do: :erlang.nif_error(:nif_not_loaded)
+
+    def send_message(_stream_id, _topic_id, _partitioning, _message),
+    do: :erlang.nif_error(:nif_not_loaded)
 end

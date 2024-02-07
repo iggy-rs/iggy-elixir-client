@@ -1,3 +1,6 @@
+// use std::fmt::Debug;
+use std::str::FromStr;
+
 use crate::atom;
 // use crate::send_message::SendMessage;
 use iggy::client::{Client, MessageClient, StreamClient, SystemClient, TopicClient, UserClient};
@@ -131,31 +134,25 @@ fn create_topic(
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
-fn send_messages(
+fn send_message(
     env: Env,
     stream_id: u32,
     topic_id: u32,
     partitioning: u32,
-    messages: &'a ListIterator,
-) -> Result<Term<'a>, RustlerError> {
+    message: String,
+) -> Result<Term, RustlerError> {
     let resource = &IGGY_CLIENT;
-    // let messages: Vec<SendMessage> = messages
-    //     .iter()
-    //     .map(|item| item.extract::<SendMessage>())
-    //     .collect::<Result<Vec<_>, _>>()?;
-    let messages: Vec<RustMessage> = messages
-        .into_iter()
-        .map(|message| message.inner)
-        .collect::<Vec<_>>();
-
-    let mut messages = SendMessages {
+    let mut messages = Vec::new();
+    let message = RustMessage::from_str(&message).unwrap();
+    messages.push(message);
+    let mut msgs = SendMessages {
         stream_id: Identifier::numeric(stream_id).unwrap(),
         topic_id: Identifier::numeric(topic_id).unwrap(),
         partitioning: Partitioning::partition_id(partitioning),
         messages,
     };
 
-    let send_message_future = resource.inner.send_messages(&mut messages);
+    let send_message_future = resource.inner.send_messages(&mut msgs);
     match resource
         .runtime
         .block_on(async move { send_message_future.await })
@@ -163,6 +160,48 @@ fn send_messages(
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn send_messages(
+    env: Env,
+    stream_id: u32,
+    topic_id: u32,
+    partitioning: u32,
+    messages: ListIterator,
+) -> Result<Term, RustlerError> {
+    let resource = &IGGY_CLIENT;
+    // let messages: Vec<SendMessage> = messages
+    //     .iter()
+    //     .map(|item| item.extract::<SendMessage>())
+    //     .collect::<Result<Vec<_>, _>>()?;
+    let messages: Vec<RustMessage> = messages
+        .into_iter()
+        .map(|message| {
+            let message = message.decode::<String>().unwrap();
+            let message = RustMessage::from_str(&message).unwrap();
+            message
+        })
+        .collect();
+
+    // let mut messages = SendMessages {
+    //     stream_id: Identifier::numeric(stream_id).unwrap(),
+    //     topic_id: Identifier::numeric(topic_id).unwrap(),
+    //     partitioning: Partitioning::partition_id(partitioning),
+    //     messages,
+    // };
+
+    // let send_message_future = resource.inner.send_messages(&mut messages);
+    // match resource
+    //     .runtime
+    //     .block_on(async move { send_message_future.await })
+    // {
+    //     Ok(_) => Ok(atom::ok().encode(env)),
+    //     Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
+    // }
+
+    println!("{:?}", messages);
+    Ok(atom::ok().encode(env))
 }
 
 // #[rustler::nif(schedule = "DirtyIo")]
