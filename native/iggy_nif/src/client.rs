@@ -163,45 +163,36 @@ fn send_message(
 }
 
 #[rustler::nif(schedule = "DirtyIo")]
-fn send_messages(
-    env: Env,
+fn send_messages<'a>(
+    env: Env<'a>,
     stream_id: u32,
     topic_id: u32,
     partitioning: u32,
-    messages: ListIterator,
-) -> Result<Term, RustlerError> {
+    messages: ListIterator<'a>,
+) -> Result<Term<'a>, RustlerError> {
     let resource = &IGGY_CLIENT;
-    // let messages: Vec<SendMessage> = messages
-    //     .iter()
-    //     .map(|item| item.extract::<SendMessage>())
-    //     .collect::<Result<Vec<_>, _>>()?;
     let messages: Vec<RustMessage> = messages
         .into_iter()
-        .map(|message| {
-            let message = message.decode::<String>().unwrap();
-            let message = RustMessage::from_str(&message).unwrap();
-            message
-        })
+        .map(|message|
+            RustMessage::from_str(&message.decode::<String>().unwrap()).unwrap()
+        )
         .collect();
 
-    // let mut messages = SendMessages {
-    //     stream_id: Identifier::numeric(stream_id).unwrap(),
-    //     topic_id: Identifier::numeric(topic_id).unwrap(),
-    //     partitioning: Partitioning::partition_id(partitioning),
-    //     messages,
-    // };
+    let mut messages = SendMessages {
+        stream_id: Identifier::numeric(stream_id).unwrap(),
+        topic_id: Identifier::numeric(topic_id).unwrap(),
+        partitioning: Partitioning::partition_id(partitioning),
+        messages,
+    };
 
-    // let send_message_future = resource.inner.send_messages(&mut messages);
-    // match resource
-    //     .runtime
-    //     .block_on(async move { send_message_future.await })
-    // {
-    //     Ok(_) => Ok(atom::ok().encode(env)),
-    //     Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
-    // }
-
-    println!("{:?}", messages);
-    Ok(atom::ok().encode(env))
+    let send_message_future = resource.inner.send_messages(&mut messages);
+    match resource
+        .runtime
+        .block_on(async move { send_message_future.await })
+    {
+        Ok(_) => Ok(atom::ok().encode(env)),
+        Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
+    }
 }
 
 // #[rustler::nif(schedule = "DirtyIo")]
