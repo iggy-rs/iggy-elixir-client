@@ -1,13 +1,16 @@
+use std::str::FromStr;
+
 use crate::atom;
-use iggy::client::{Client, StreamClient, SystemClient, TopicClient, UserClient};
+use iggy::client::{Client, MessageClient, StreamClient, SystemClient, TopicClient, UserClient};
 use iggy::clients::client::IggyClient;
 use iggy::identifier::Identifier;
+use iggy::messages::send_messages::{Message as RustMessage, Partitioning, SendMessages};
 use iggy::streams::create_stream::CreateStream;
 use iggy::system::ping::Ping;
 use iggy::topics::create_topic::CreateTopic;
 use iggy::users::login_user::LoginUser;
 use lazy_static::lazy_static;
-use rustler::{Encoder, Error as RustlerError};
+use rustler::{Encoder, Error as RustlerError, ListIterator};
 use rustler::{Env, Term};
 use tokio::runtime::{Builder, Runtime};
 
@@ -46,7 +49,7 @@ fn connect(env: Env) -> Result<Term, RustlerError> {
         Err(err) => Err(RustlerError::Term(Box::new(err.to_string()))),
     }
 }
-// for slower functions remember to use dirty scheduler
+
 //#[rustler::nif(schedule = "DirtyCpu")]
 #[rustler::nif]
 fn ping(env: Env) -> Result<Term, RustlerError> {
@@ -85,10 +88,7 @@ fn create_stream(env: Env, stream_id: u32, name: String) -> Result<Term, Rustler
     };
     let create_stream_future = resource.inner.create_stream(&create_stream);
 
-    match resource
-        .runtime
-        .block_on(async move { create_stream_future.await })
-    {
+    match resource.runtime.block_on(create_stream_future) {
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
@@ -119,23 +119,65 @@ fn create_topic(
     };
     let create_topic_future = resource.inner.create_topic(&create_topic);
 
-    match resource
-        .runtime
-        .block_on(async move { create_topic_future.await })
-    {
+    match resource.runtime.block_on(create_topic_future) {
         Ok(_) => Ok(atom::ok().encode(env)),
         Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
     }
 }
 
-// #[rustler::nif(schedule = "DirtyIo")]
-// fn send_messages(env: Env,
-//     stream_id: u32,
-//     topic_id: u32,
-//     partitioning: u32,
-//     messages: &ListIterator) -> Result<Term, RustlerError> {
+#[rustler::nif(schedule = "DirtyIo")]
+fn send_message(
+    env: Env,
+    stream_id: u32,
+    topic_id: u32,
+    partitioning: u32,
+    message: String,
+) -> Result<Term, RustlerError> {
+    let resource = &IGGY_CLIENT;
+    let mut messages = Vec::new();
+    let message = RustMessage::from_str(&message).unwrap();
+    messages.push(message);
+    let mut msgs = SendMessages {
+        stream_id: Identifier::numeric(stream_id).unwrap(),
+        topic_id: Identifier::numeric(topic_id).unwrap(),
+        partitioning: Partitioning::partition_id(partitioning),
+        messages,
+    };
 
-// }
+    let send_message_future = resource.inner.send_messages(&mut msgs);
+    match resource.runtime.block_on(send_message_future) {
+        Ok(_) => Ok(atom::ok().encode(env)),
+        Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
+    }
+}
+
+#[rustler::nif(schedule = "DirtyIo")]
+fn send_messages<'a>(
+    env: Env<'a>,
+    stream_id: u32,
+    topic_id: u32,
+    partitioning: u32,
+    messages: ListIterator<'a>,
+) -> Result<Term<'a>, RustlerError> {
+    let resource = &IGGY_CLIENT;
+    let messages: Vec<RustMessage> = messages
+        .into_iter()
+        .map(|message| RustMessage::from_str(&message.decode::<String>().unwrap()).unwrap())
+        .collect();
+
+    let mut messages = SendMessages {
+        stream_id: Identifier::numeric(stream_id).unwrap(),
+        topic_id: Identifier::numeric(topic_id).unwrap(),
+        partitioning: Partitioning::partition_id(partitioning),
+        messages,
+    };
+
+    let send_messages_future = resource.inner.send_messages(&mut messages);
+    match resource.runtime.block_on(send_messages_future) {
+        Ok(_) => Ok(atom::ok().encode(env)),
+        Err(e) => Err(RustlerError::Term(Box::new(e.to_string()))),
+    }
+}
 
 // #[rustler::nif(schedule = "DirtyIo")]
 // fn poll_messages(
@@ -147,102 +189,6 @@ fn create_topic(
 //     auto_commit: bool,
 // ) -> Result<ListIterator, RustlerError> {
 // }
-
-// TODO:
-// Port remaining functions from Python client
-//
-// impl IggyClient {
-//     /// Constructs a new IggyClient.
-//     ///
-//     /// This initializes a new runtime for asynchronous operations.
-//     /// Future versions might utilize asyncio for more Pythonic async.
-//     #[new]
-//     fn new() -> Self {
-//         // TODO: use asyncio
-//         let runtime = Builder::new_multi_thread()
-//             .worker_threads(4) // number of worker threads
-//             .enable_all() // enables all available Tokio features
-//             .build()
-//             .unwrap();
-//         IggyClient {
-//             inner: RustIggyClient::default(),
-//             runtime,
-//         }
-//     }
-
-//     /// Creates a new stream with the provided ID and name.
-//     ///
-//     /// Returns Ok(()) on successful stream creation or a PyRuntimeError on failure.
-//     fn create_stream(&self, stream_id: u32, name: String) -> PyResult<()> {
-//         let create_stream = CreateStream { stream_id, name };
-//         let create_stream_future = self.inner.create_stream(&create_stream);
-//         let _create_stream = self
-//             .runtime
-//             .block_on(async move { create_stream_future.await })
-//             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-//         PyResult::Ok(())
-//     }
-
-//     /// Creates a new topic with the given parameters.
-//     ///
-//     /// Returns Ok(()) on successful topic creation or a PyRuntimeError on failure.
-//     fn create_topic(
-//         &self,
-//         stream_id: u32,
-//         topic_id: u32,
-//         partitions_count: u32,
-//         name: String,
-//     ) -> PyResult<()> {
-//         let create_topic = CreateTopic {
-//             stream_id: Identifier::numeric(stream_id).map_err(|e| {
-//                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e))
-//             })?,
-//             topic_id,
-//             name,
-//             partitions_count,
-//             message_expiry: None,
-//         };
-//         let create_topic_future = self.inner.create_topic(&create_topic);
-//         let _create_topic = self
-//             .runtime
-//             .block_on(async move { create_topic_future.await })
-//             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-//         PyResult::Ok(())
-//     }
-
-//     /// Sends a list of messages to the specified topic.
-//     ///
-//     /// Returns Ok(()) on successful sending or a PyRuntimeError on failure.
-//     fn send_messages(
-//         &self,
-//         stream_id: u32,
-//         topic_id: u32,
-
-//         partitioning: u32,
-//         messages: &PyList,
-//     ) -> PyResult<()> {
-//         let messages: Vec<SendMessage> = messages
-//             .iter()
-//             .map(|item| item.extract::<SendMessage>())
-//             .collect::<Result<Vec<_>, _>>()?;
-//         let messages: Vec<RustMessage> = messages
-//             .into_iter()
-//             .map(|message| message.inner)
-//             .collect::<Vec<_>>();
-
-//         let mut messages = SendMessages {
-//             stream_id: Identifier::numeric(stream_id).unwrap(),
-//             topic_id: Identifier::numeric(topic_id).unwrap(),
-//             partitioning: Partitioning::partition_id(partitioning),
-//             messages,
-//         };
-
-//         let send_message_future = self.inner.send_messages(&mut messages);
-//         self.runtime
-//             .block_on(async move { send_message_future.await })
-//             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{:?}", e)))?;
-//         PyResult::Ok(())
-//     }
 
 //     /// Polls for messages from the specified topic and partition.
 //     ///
